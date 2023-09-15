@@ -2,7 +2,6 @@ import cv2  # opencv-python
 import os
 import re
 import urllib
-from keras.models import load_model
 import numpy as np
 import pandas as pd
 import random
@@ -56,7 +55,6 @@ def snapshot():
 
 
 def emotion_from_camera(name):
-    model = load_model("model.h5")
     face_cascade = cv2.CascadeClassifier(
         cv2.samples.findFile("haarcascade_frontalface_default.xml")
     )
