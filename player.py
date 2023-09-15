@@ -4,7 +4,7 @@ from pytube import YouTube
 import vlc
 from youtubesearchpython import VideosSearch
 
-CSV_FILE = "Happy.csv"
+CSV_FILE = "/Song_Name/{Emotion}.csv"
 
 
 def load_songs(csv_file):
