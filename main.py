@@ -2,15 +2,19 @@ import cv2  # opencv-python
 import os
 import re
 import urllib
+from keras.models import load_model
 import numpy as np
 import pandas as pd
-import random
 import player
+
+# Constants
+MODEL_FILE = "model.h5"
+SNAPSHOT_FILE = "Snapshot.jpg"
+LABELS = ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise", "Neutral"]
 
 
 def snapshot():
     cap = cv2.VideoCapture(0)
-    name = "Snapshot.jpg"
     ret = True
     frames = []
 
@@ -36,7 +40,7 @@ def snapshot():
         cv2.imshow("Video", frame)
 
         if cv2.waitKey(3) & 0xFF == ord("q"):
-            cv2.imwrite(name, frame)
+            cv2.imwrite(SNAPSHOT_FILE, frame)
             break
 
     cap.release()
@@ -45,21 +49,21 @@ def snapshot():
     if frames:
         # Average frames for better emotion detection
         avg_frame = np.mean(frames, axis=0).astype(np.uint8)
-        cv2.imwrite(name, avg_frame)
-        emotion = emotion_from_camera(name)
-        os.remove(name)
+        cv2.imwrite(SNAPSHOT_FILE, avg_frame)
+        emotion = emotion_from_camera(SNAPSHOT_FILE)
+        os.remove(SNAPSHOT_FILE)
         return emotion
     else:
         print("No frames captured.")
         return None
 
 
-def emotion_from_camera(name):
+def emotion_from_camera(snapshot_file):
+    model = load_model(MODEL_FILE)
     face_cascade = cv2.CascadeClassifier(
         cv2.samples.findFile("haarcascade_frontalface_default.xml")
     )
-    img = cv2.imread(name)
-    labels = ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise", "Neutral"]
+    img = cv2.imread(snapshot_file)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray)
     for x, y, w, h in faces:
@@ -68,7 +72,7 @@ def emotion_from_camera(name):
         faceROI = np.expand_dims(faceROI, axis=0)
         faceROI = np.expand_dims(faceROI, axis=3)
         prediction = model.predict(faceROI)
-    return labels[int(np.argmax(prediction))]
+    return LABELS[int(np.argmax(prediction))]
 
 
 def song_recommendations(emotion):
@@ -108,12 +112,11 @@ def main():
             if video_ids:
                 yt_link = "https://www.youtube.com/watch?v=" + video_ids[0]
                 print(f"Song: {song}, YouTube Link: {yt_link}")
-                player.play_random_song(csv_name)
+                player.play_random_song(emotion)
 
         except Exception as e:
             print(f"Error in processing song {song}: {str(e)}")
 
 
 if __name__ == "__main__":
-    csv_name = "model.h5"
     main()
