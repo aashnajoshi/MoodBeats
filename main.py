@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import player
 
-# Constants
 MODEL_FILE = "model.h5"
 SNAPSHOT_FILE = "Snapshot.jpg"
 LABELS = ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise", "Neutral"]
@@ -47,7 +46,6 @@ def snapshot():
     cv2.destroyAllWindows()
 
     if frames:
-        # Average frames for better emotion detection
         avg_frame = np.mean(frames, axis=0).astype(np.uint8)
         cv2.imwrite(SNAPSHOT_FILE, avg_frame)
         emotion = emotion_from_camera(SNAPSHOT_FILE)
