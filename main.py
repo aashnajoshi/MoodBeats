@@ -1,34 +1,27 @@
-"""
-Install all required packages:
-run 'pip install -r requirements.txt'
-
-"""
-
-import cv2  
-import os
-import re
-import urllib.request  
+import cv2
 import numpy as np
-import player as pl
+import csv
+import random
+import pywhatkit as pl
 from keras.models import load_model
+from youtubesearchpython import VideosSearch
 
 labels = ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise", "Neutral"]
 model = load_model("model.h5")
 
-
-def cam_not_accessed():
+def not_com():
     user_feeling = input("How are you feeling today? ").strip().capitalize()
 
     if user_feeling in labels:
         emotion = user_feeling
-        song_recommendations(emotion)
+        play_random_song(emotion)
+        return True
     else:
         print("Invalid emotion. Please choose from the following: ", labels)
+        return False
 
-
-def snapshot():
+def detect_emotion():
     cap = cv2.VideoCapture(0)
-    name = "Snapshot.jpg"
     frames = []
 
     while True:
@@ -37,96 +30,101 @@ def snapshot():
 
         if not ret:
             print("Can't access camera")
-            cam_not_accessed()
-        else:
-            frames.append(frame)
-            cv2.putText(
-                frame,
-                "Press q to take snapshot",
-                (50, 50),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.9,
-                (0, 0, 0),
-                1,
-                cv2.LINE_AA,
-            )
-            cv2.imshow("Video", frame)
-
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                cv2.imwrite(name, frame)
+            if not_com():
                 break
+
+        frames.append(frame)
+        cv2.putText(
+            frame,
+            "Press q to take snapshot",
+            (50, 50),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.9,
+            (0, 0, 0),
+            1,
+            cv2.LINE_AA,
+        )
+        cv2.imshow("Video", frame)
+
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
 
     cap.release()
     cv2.destroyAllWindows()
 
     if frames:
         avg_frame = np.mean(frames, axis=0).astype(np.uint8)
-        cv2.imwrite(name, avg_frame)
-        if "emotion" not in locals():
-            emotion = emotion_from_camera(name)
-        return emotion
-    else:
-        print("No frames captured.")
-        cam_not_accessed()
+        avg_frame = cv2.resize(avg_frame, (640, 480))  # Adjust image size
+        cv2.imwrite("Snapshot.jpg", avg_frame)
+        img = cv2.imread("Snapshot.jpg", cv2.IMREAD_GRAYSCALE)
+        faces = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml").detectMultiScale(
+            img, scaleFactor=1.1, minNeighbors=5
+        )
+        if len(faces) > 0:
+            faceROI = cv2.resize(img[faces[0][1]:faces[0][1]+faces[0][3], faces[0][0]:faces[0][0]+faces[0][2]], (48, 48), interpolation=cv2.INTER_NEAREST)
+            faceROI = np.expand_dims(faceROI, axis=0)
+            faceROI = np.expand_dims(faceROI, axis=3)
+            prediction = model.predict(faceROI)
+            return labels[int(np.argmax(prediction))]
+        else:
+            print("No frames captured.")
+            if not_com():
+                return None
 
-
-def emotion_from_camera(name):
-    face_cascade = cv2.CascadeClassifier(
-        cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-    )
-    img = cv2.imread(name, cv2.IMREAD_GRAYSCALE)
-    faces = face_cascade.detectMultiScale(img, scaleFactor=1.1, minNeighbors=5)
-
-    if len(faces) > 0:
-        faceROI = cv2.resize(faces[0], (48, 48), interpolation=cv2.INTER_NEAREST)
-        faceROI = np.expand_dims(faceROI, axis=0)
-        faceROI = np.expand_dims(faceROI, axis=3)
-        prediction = model.predict(faceROI)
-        return labels[int(np.argmax(prediction))]
-
-    return "Unknown"
-
-
-def song_recommendations(emotion):
-    print(f"Detected emotion: {emotion}")
+def play_random_song(emotion):
     csv_name = f"Song_Names/{emotion}.csv"
-    if not os.path.exists(csv_name):
+    songs = []
+
+    try:
+        with open(csv_name, mode="r", newline="") as file:
+            songs = list(csv.DictReader(file))
+    except FileNotFoundError:
         print(f"No song recommendations found for emotion: {emotion}")
-        cam_not_accessed()
-    else:
-        pl.play_random_song(csv_name)
 
-
-def main():
-    emotion = snapshot()
-
-    if emotion is None:
-        cam_not_accessed()
-
-    song_recommendations(emotion)
-
-def play_songs(emotion):
-    song_list = pl.play_random_song(emotion)
-
-    if not song_list:
-        print("No song recommendations found.")
+    if not songs:
         return
 
-    for song in song_list:
-        url = "+".join(song.split())
-        search_url = f"https://www.youtube.com/results?search_query={url}"
-        try:
-            html = urllib.request.urlopen(search_url)
-            video_ids = re.findall(r"watch\?v=(\S{11})", html.read().decode())
+    played_songs = set()
 
-            if video_ids:
-                yt_link = f"https://www.youtube.com/watch?v={video_ids[0]}"
-                print(f"Song: {song}, YouTube Link: {yt_link}")
-                pl.play_random_song(yt_link)
+    while True:
+        remaining_songs = [song for song in songs if song["Song Name"] not in played_songs]
+        if not remaining_songs:
+            print("No more songs to play.")
+            break
 
-        except Exception as e:
-            print(f"Error in processing song {song}: {str(e)}")
+        random_song = random.choice(remaining_songs)
+        song_name = random_song.get("Song Name")
+        search_query = f"{song_name} official music video YouTube"
+        videos_search = VideosSearch(search_query, limit=1)
+        results = videos_search.result()
 
+        if results["result"]:
+            video_url = results["result"][0]["link"]
+            try:
+                print(f"Playing song: {song_name}, link {video_url}")
+                pl.playonyt(video_url)
+                played_songs.add(song_name)
+                user_choice = input("Press 'Enter' to play another song, or 'x' to exit: ").strip().lower()
+                if user_choice == 'x':
+                    break
+            except Exception as e:
+                print(f"Error in processing song {song_name}, link {video_url}: {str(e)}")
+
+def main():
+    while True:
+        if cv2.VideoCapture(0).isOpened():  # Check if the camera is accessible
+            emotion = detect_emotion()
+            if emotion:
+                print(f"Detected emotion: {emotion}")
+                play_random_song(emotion)
+            break
+        else:
+            print("Can't access camera. Please check your camera.")
+            if not not_com():
+                break
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"An unexpected error occurred: {str(e)}")
