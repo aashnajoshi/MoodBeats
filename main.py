@@ -1,3 +1,8 @@
+"""
+Install all required packages:
+run 'pip install -r requirements.txt'
+"""
+
 import cv2
 import numpy as np
 import csv
