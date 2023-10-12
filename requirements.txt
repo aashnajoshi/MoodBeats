@@ -5,5 +5,3 @@ random
 pywhatkit
 keras
 youtube-search-python
-
-pytube3
