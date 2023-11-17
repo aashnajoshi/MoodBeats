@@ -11,77 +11,38 @@ import pywhatkit as pl
 from keras.models import load_model
 from youtubesearchpython import VideosSearch
 
-labels = ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise", "Neutral"]
+labels = ["Angry", "Romantic", "Fear", "Happy", "Sad", "Surprise", "Neutral"]
 model = load_model("model.h5")
 
 
-def not_com():
-    user_feeling = input("How are you feeling today? ").strip().capitalize()
-
-    if user_feeling in labels:
-        emotion = user_feeling
-        play_random_song(emotion)
-        return True
-    else:
-        print("Invalid emotion. Please choose from the following: ", labels)
-        return False
-
-
-def detect_emotion():
-    cap = cv2.VideoCapture(0)
-    frames = []
-
+def get_user_feeling():
     while True:
-        ret, frame = cap.read()
-        frame = cv2.flip(frame, 1)
+        user_feeling = input("How are you feeling today? ").strip().capitalize()
 
-        if not ret:
-            print("Can't access camera")
-            not_com()
-
-        frames.append(frame)
-        cv2.putText(
-            frame,
-            "Press q to take snapshot",
-            (50, 50),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.9,
-            (0, 0, 0),
-            1,
-            cv2.LINE_AA,
-        )
-        cv2.imshow("Video", frame)
-
-        if cv2.waitKey(1) & 0xFF == ord("q"):
-            break
-
-    cap.release()
-    cv2.destroyAllWindows()
-
-    if frames:
-        avg_frame = np.mean(frames, axis=0).astype(np.uint8)
-        avg_frame = cv2.resize(avg_frame, (640, 480))  # Adjust image size
-        cv2.imwrite("Snapshot.jpg", avg_frame)
-        img = cv2.imread("Snapshot.jpg", cv2.IMREAD_GRAYSCALE)
-        faces = cv2.CascadeClassifier(
-            cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-        ).detectMultiScale(img, scaleFactor=1.1, minNeighbors=5)
-        if len(faces) > 0:
-            faceROI = cv2.resize(
-                img[
-                    faces[0][1] : faces[0][1] + faces[0][3],
-                    faces[0][0] : faces[0][0] + faces[0][2],
-                ],
-                (48, 48),
-                interpolation=cv2.INTER_NEAREST,
-            )
-            faceROI = np.expand_dims(faceROI, axis=0)
-            faceROI = np.expand_dims(faceROI, axis=3)
-            prediction = model.predict(faceROI)
-            return labels[int(np.argmax(prediction))]
+        if user_feeling in labels:
+            return user_feeling
         else:
-            print("No frames captured.")
-            not_com()
+            print("Invalid emotion. Please choose from the following: ", labels)
+
+
+def detect_emotion(frame):
+    img = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    faces = cv2.CascadeClassifier(
+        cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+    ).detectMultiScale(img, scaleFactor=1.1, minNeighbors=5)
+    if len(faces) > 0:
+        faceROI = cv2.resize(
+            img[
+                faces[0][1] : faces[0][1] + faces[0][3],
+                faces[0][0] : faces[0][0] + faces[0][2],
+            ],
+            (48, 48),
+            interpolation=cv2.INTER_NEAREST,
+        )
+        faceROI = np.expand_dims(faceROI, axis=0)
+        faceROI = np.expand_dims(faceROI, axis=3)
+        prediction = model.predict(faceROI)
+        return labels[int(np.argmax(prediction))]
 
 
 def play_random_song(emotion):
@@ -89,7 +50,7 @@ def play_random_song(emotion):
     songs = []
 
     try:
-        with open(csv_name, mode="r", newline="") as file:
+        with open(csv_name, "r", encoding="utf-8") as file:
             songs = list(csv.DictReader(file))
     except FileNotFoundError:
         print(f"No song recommendations found for emotion: {emotion}")
@@ -125,7 +86,7 @@ def play_random_song(emotion):
                     .lower()
                 )
                 if user_choice == "x":
-                    break
+                    exit()
             except Exception as e:
                 print(
                     f"Error in processing song {song_name}, link {video_url}: {str(e)}"
@@ -133,16 +94,29 @@ def play_random_song(emotion):
 
 
 def main():
+    cap = cv2.VideoCapture(0)
+
+    if not cap.isOpened():
+        print("Can't access camera")
+        user_feeling = get_user_feeling()
+        play_random_song(user_feeling)
+        return
+
     while True:
-        if cv2.VideoCapture(0).isOpened():  # Check if the camera is accessible
-            emotion = detect_emotion()
+        ret, frame = cap.read()
+        frame = cv2.flip(frame, 1)  # Flip horizontally
+
+        cv2.imshow("Camera", frame)
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            cv2.imwrite("snapshot.jpg", frame)
+            print("Snapshot captured and saved as snapshot.jpg")
+            emotion = detect_emotion(frame)
             if emotion:
                 print(f"Detected emotion: {emotion}")
                 play_random_song(emotion)
-            break
-        else:
-            print("Can't access camera. Please check your camera.")
-            not_com()
+
+    cap.release()
+    cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
