@@ -22,7 +22,7 @@ def get_user_feeling():
         if user_feeling in labels:
             return user_feeling
         else:
-            print("Invalid emotion. Please choose from the following: ", labels)
+            print("Invalid emotion. Let's try again: ", labels)
 
 
 def detect_emotion(frame):
