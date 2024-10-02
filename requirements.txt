@@ -1,7 +1,7 @@
-opencv-python
-numpy
+opencv-python==4.5.5.64
+numpy==1.21.6
+pywhatkit==5.4
+keras==2.6.0
+youtubesearchpython==1.6.4
 csv
 random
-pywhatkit
-keras
-youtube-search-python

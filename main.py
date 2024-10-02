@@ -1,8 +1,3 @@
-"""
-Install all required packages:
-run 'pip install -r requirements.txt'
-"""
-
 import cv2
 import numpy as np
 import csv
@@ -14,7 +9,6 @@ from youtubesearchpython import VideosSearch
 labels = ["Angry", "Romantic", "Fear", "Happy", "Sad", "Surprise", "Neutral"]
 model = load_model("model.h5")
 
-
 def get_user_feeling():
     while True:
         user_feeling = input("How are you feeling today? ").strip().capitalize()
@@ -23,7 +17,6 @@ def get_user_feeling():
             return user_feeling
         else:
             print("Invalid emotion. Let's try again: ", labels)
-
 
 def detect_emotion(frame):
     img = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -38,12 +31,11 @@ def detect_emotion(frame):
             ],
             (48, 48),
             interpolation=cv2.INTER_NEAREST,
-        )
+)
         faceROI = np.expand_dims(faceROI, axis=0)
         faceROI = np.expand_dims(faceROI, axis=3)
         prediction = model.predict(faceROI)
         return labels[int(np.argmax(prediction))]
-
 
 def play_random_song(emotion):
     csv_name = f"Song_Names/{emotion}.csv"
@@ -92,7 +84,6 @@ def play_random_song(emotion):
                     f"Error in processing song {song_name}, link {video_url}: {str(e)}"
                 )
 
-
 def main():
     cap = cv2.VideoCapture(0)
 
@@ -105,7 +96,6 @@ def main():
     while True:
         ret, frame = cap.read()
         frame = cv2.flip(frame, 1)  # Flip horizontally
-
         cv2.imshow("Camera", frame)
         if cv2.waitKey(1) & 0xFF == ord("q"):
             cv2.imwrite("snapshot.jpg", frame)
@@ -117,7 +107,6 @@ def main():
 
     cap.release()
     cv2.destroyAllWindows()
-
 
 if __name__ == "__main__":
     try:
