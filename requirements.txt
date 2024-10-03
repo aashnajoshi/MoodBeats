@@ -3,5 +3,6 @@ numpy==1.21.6
 pywhatkit==5.4
 keras==2.6.0
 youtubesearchpython==1.6.4
+streamlit==1.10.0
 csv
 random
