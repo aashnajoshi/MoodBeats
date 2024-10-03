@@ -6,17 +6,18 @@ EmoTunes is an emotion-based music recommendation system. It detects a user's em
 - Neural network model integration
 - YouTube song playback according to detected emotions
 
-## All required libraries can be installed using a single-line command:
+## Usage
+### All required libraries can be installed using a single-line command:
 ```bash
 pip install -r requirements.txt
 ```
 
-## While to run the code:
-### Console-based version:
+### While to run the code:
+#### Console-based version:
 ```bash
 python main.py
 ```
-### Streamlit-based version:
+#### Streamlit-based version:
 ```bash
 streamlit run app.py
 ```
