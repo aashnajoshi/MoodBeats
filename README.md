@@ -1,5 +1,5 @@
-# EmoTunes
-EmoTunes is an emotion-based music recommendation system. It detects a user's emotion in real-time using a webcam, processes the image through a trained neural network model, and plays a YouTube song corresponding to the detected emotion. The songs are selected from CSV files based on different emotional categories (e.g., Happy, Sad). Users can also manually choose their emotions for a more customized experience.
+# MoodBeats
+MoodBeats is an emotion-based music recommendation system. It detects a user's emotion in real-time using a webcam, processes the image through a trained neural network model, and plays a YouTube song corresponding to the detected emotion. The songs are selected from CSV files based on different emotional categories (e.g., Happy, Sad). Users can also manually choose their emotions for a more customized experience.
 
 ## Features
 - Real-time emotion detection via webcam
