@@ -16,7 +16,7 @@ logging.disable(logging.CRITICAL)  # Disables all logging
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['WDM_LOG'] = '0'  # Suppress WebDriver Manager logs
 warnings.filterwarnings("ignore")
-labels = ["Angry", "Romantic", "Fear", "Happy", "Sad", "Surprise", "Neutral"]
+labels = ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise", "Neutral"]
 
 try:
     model = load_model("model.h5")
