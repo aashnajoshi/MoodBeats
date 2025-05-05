@@ -1,115 +1,160 @@
 import cv2
 import numpy as np
+import os
+import re
 import csv
 import random
-import pywhatkit as pl
-from keras.models import load_model
-from youtubesearchpython import VideosSearch
+import warnings
+from tensorflow.keras.models import load_model
+from selenium import webdriver
+from selenium.webdriver.edge.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.edge.service import Service
+import logging
 
+logging.disable(logging.CRITICAL)  # Disables all logging
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['WDM_LOG'] = '0'  # Suppress WebDriver Manager logs
+warnings.filterwarnings("ignore")
 labels = ["Angry", "Romantic", "Fear", "Happy", "Sad", "Surprise", "Neutral"]
-model = load_model("model.h5")
+
+try:
+    model = load_model("model.h5")
+except:
+    exit()
 
 def get_user_feeling():
     while True:
-        user_feeling = input("How are you feeling today? ").strip().capitalize()
-
+        user_feeling = input("Your Cam is busy... How are you feeling? ").strip().capitalize()
         if user_feeling in labels:
             return user_feeling
-        else:
-            print("Invalid emotion. Let's try again: ", labels)
+        print(f"Invalid emotion. Try one of: {labels}")
 
 def detect_emotion(frame):
-    img = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = cv2.CascadeClassifier(
-        cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-    ).detectMultiScale(img, scaleFactor=1.1, minNeighbors=5)
-    if len(faces) > 0:
-        faceROI = cv2.resize(
-            img[
-                faces[0][1] : faces[0][1] + faces[0][3],
-                faces[0][0] : faces[0][0] + faces[0][2],
-            ],
-            (48, 48),
-            interpolation=cv2.INTER_NEAREST,
-)
-        faceROI = np.expand_dims(faceROI, axis=0)
-        faceROI = np.expand_dims(faceROI, axis=3)
-        prediction = model.predict(faceROI)
-        return labels[int(np.argmax(prediction))]
+    try:
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+        faces = face_cascade.detectMultiScale(img, scaleFactor=1.1, minNeighbors=5)
+        if len(faces) == 0:
+            return None
+        x, y, w, h = faces[0]
+        face_roi = cv2.resize(img[y:y+h, x:x+w], (48, 48))
+        face_roi = np.expand_dims(face_roi, axis=0)
+        face_roi = np.expand_dims(face_roi, axis=3)
+        prediction = model.predict(face_roi, verbose=0)
+        emotion = labels[int(np.argmax(prediction))]
+        return emotion
+    except:
+        return None
+
+def clean_song_title(song_name):
+    song_name = re.sub(r'[–—]', ' ', song_name)
+    song_name = re.sub(r'\s*\([^)]+\)', '', song_name)
+    song_name = re.sub(r'\bLYRICS\b', '', song_name, flags=re.IGNORECASE)
+    return ' '.join(song_name.split())
+
+def get_first_youtube_video_url(search_query):
+    driver = None
+    try:
+        options = Options()
+        options.add_argument("--headless")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--log-level=3")
+        options.add_experimental_option('excludeSwitches', ['enable-logging'])
+        service = Service(log_output=os.devnull)
+        driver = webdriver.Edge(options=options, service=service)
+        driver.get(f"https://www.youtube.com/results?search_query={search_query.replace(' ', '+')}+official+music+video")
+        videos = driver.find_elements(By.CSS_SELECTOR, 'a#video-title')
+        for video in videos:
+            title = video.get_attribute('title')
+            link = video.get_attribute('href')
+            if link and "watch?v=" in link and title and "official" in title.lower():
+                return link
+        for video in videos:
+            link = video.get_attribute('href')
+            if link and "watch?v=" in link:
+                return link
+        return None
+    except:
+        return None
+    finally:
+        if driver:
+            try:
+                driver.quit()
+            except:
+                pass
 
 def play_random_song(emotion):
     csv_name = f"Song_Names/{emotion}.csv"
-    songs = []
-
     try:
         with open(csv_name, "r", encoding="utf-8") as file:
-            songs = list(csv.DictReader(file))
-    except FileNotFoundError:
-        print(f"No song recommendations found for emotion: {emotion}")
-
+            songs = [row[0].strip() for row in csv.reader(file) if row and row[0].strip()]
+    except:
+        print(f"Error: Could not read {csv_name}")
+        return
     if not songs:
+        print("No songs found in the CSV")
         return
 
-    played_songs = set()
-
-    while True:
-        remaining_songs = [
-            song for song in songs if song["Song Name"] not in played_songs
-        ]
-        if not remaining_songs:
-            print("No more songs to play.")
-            break
-
-        random_song = random.choice(remaining_songs)
-        song_name = random_song.get("Song Name")
-        search_query = f"{song_name} official music video YouTube"
-        videos_search = VideosSearch(search_query, limit=1)
-        results = videos_search.result()
-
-        if results["result"]:
-            video_url = results["result"][0]["link"]
+    driver = None
+    try:
+        options = Options()
+        options.add_argument("--disable-gpu")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--log-level=3")
+        options.add_experimental_option('excludeSwitches', ['enable-logging'])
+        service = Service(log_output=os.devnull)
+        driver = webdriver.Edge(options=options, service=service)
+        while True:
+            song = random.choice(songs)
+            clean_name = clean_song_title(song)
+            url = get_first_youtube_video_url(clean_name)
+            print(f"Playing: {song}")
+            if url:
+                driver.get(url + "&autoplay=1")
+            else:
+                driver.get(f"https://www.youtube.com/results?search_query={clean_name.replace(' ', '+')}+official+music+video&autoplay=1")
+            user_choice = input("Press 'Enter' to play another song, or 'x' to exit: ").strip().lower()
+            if user_choice == 'x':
+                break
+    except Exception as e:
+        print(f"Error during playback: {e}")
+    finally:
+        if driver:
             try:
-                print(f"Playing song: {song_name}, link {video_url}")
-                pl.playonyt(video_url)
-                played_songs.add(song_name)
-                user_choice = (
-                    input("Press 'Enter' to play another song, or 'x' to exit: ")
-                    .strip()
-                    .lower()
-                )
-                if user_choice == "x":
-                    exit()
-            except Exception as e:
-                print(
-                    f"Error in processing song {song_name}, link {video_url}: {str(e)}"
-                )
+                driver.quit()
+            except:
+                pass
 
 def main():
-    cap = cv2.VideoCapture(0)
-
+    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    emotion = None
     if not cap.isOpened():
-        print("Can't access camera")
-        user_feeling = get_user_feeling()
-        play_random_song(user_feeling)
-        return
-
-    while True:
-        ret, frame = cap.read()
-        frame = cv2.flip(frame, 1)  # Flip horizontally
-        cv2.imshow("Camera", frame)
-        if cv2.waitKey(1) & 0xFF == ord("q"):
-            cv2.imwrite("snapshot.jpg", frame)
-            print("Snapshot captured and saved as snapshot.jpg")
-            emotion = detect_emotion(frame)
-            if emotion:
-                print(f"Detected emotion: {emotion}")
-                play_random_song(emotion)
-
-    cap.release()
-    cv2.destroyAllWindows()
+        emotion = get_user_feeling()
+    else:
+        try:
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                frame = cv2.flip(frame, 1)
+                cv2.imshow("Camera", frame)
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    emotion = detect_emotion(frame)
+                    if not emotion:
+                        emotion = get_user_feeling()
+                    break
+        except:
+            pass
+        finally:
+            cap.release()
+            cv2.destroyAllWindows()
+    
+    if emotion:
+        os.system('cls' if os.name == 'nt' else 'clear') 
+        print(f"Emotion Detected: {emotion}")
+        play_random_song(emotion)
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(f"An unexpected error occurred: {str(e)}")
+    main()
